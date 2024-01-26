@@ -1,0 +1,23 @@
+#Retreieve the time server name. Output it to a file. Remove the "Peer: " string from the file. Create a variable with the time server name.
+w32tm /query /peers | Out-File time.txt
+(Get-Content .\time.txt) -Replace "Peer: ", "" | Out-File .\time.txt
+$timeserver = Get-Content time.txt | Select-String "[\w+\W+]readerlink.com"
+# Replace the regex string above with "[\w+\W+].[a-z].com" to get a general time server name from the file.
+
+#Set the time zone settings for RDS access.
+New-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name EnableTimeZoneRedirection -Value 1 -PropertyType DWORD -Force
+w32tm /config /syncfromflags:domhier /update
+w32tm /config /manualpeerlist:"$timeserver,0x8 clock.adatum.com,0x2" /syncfromflags:manual /update
+
+#Set the time settings in the registry for the time offset.
+Reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\W32Time\config /v MaxNegPhaseCorrection /t REG_DWORD /d 54000 /f
+Reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\W32Time\config /v MaxPosPhaseCorrection /t REG_DWORD /d 54000 /f
+Reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\W32Time\config /v MaxPollInterval /t REG_DWORD /d 15 /f
+Reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\W32Time\config /v MaxAllowedPhaseOffset /t REG_DWORD /d 1 /f
+Reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpClient /v SpecialPollInterval /t REG_DWORD /d 32768 /f
+
+#Query the time server settings. Two should be visible. The first is the time server (usually a domain controller). The second is clock.adatum.com.
+ w32tm /query /peers
+
+ #Clean Up
+ Remove-Item time.txt
